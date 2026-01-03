@@ -9,12 +9,19 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import yaml
 from litellm import completion
 
 
-def run_chain(initial_message: str, models: list[str], system_prompt: str | None = None) -> dict:
+def run_chain(initial_message: str, models: list[str], system_prompt: str | None = None, iterations: int = 1) -> dict:
     """
     Run a message through a chain of models, telephone-game style.
+
+    Args:
+        initial_message: The starting message
+        models: List of model names to use
+        system_prompt: Optional system prompt for all models
+        iterations: Number of times to loop through the full chain
 
     Returns a dict with the full chain results.
     """
@@ -22,46 +29,57 @@ def run_chain(initial_message: str, models: list[str], system_prompt: str | None
         "initial_message": initial_message,
         "models": models,
         "system_prompt": system_prompt,
+        "iterations": iterations,
         "timestamp": datetime.now().isoformat(),
         "steps": [],
     }
 
     current_message = initial_message
+    step_number = 0
+    total_steps = len(models) * iterations
 
-    for i, model in enumerate(models):
-        print(f"\n[Step {i + 1}/{len(models)}] Sending to {model}...")
+    for iteration in range(iterations):
+        if iterations > 1:
+            print(f"\n--- Iteration {iteration + 1}/{iterations} ---")
 
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": current_message})
+        for model in models:
+            step_number += 1
+            print(f"\n[Step {step_number}/{total_steps}] Sending to {model}...")
 
-        try:
-            response = completion(model=model, messages=messages)
-            output = response.choices[0].message.content
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": current_message})
 
-            step = {
-                "step": i + 1,
-                "model": model,
-                "input": current_message,
-                "output": output,
-            }
-            results["steps"].append(step)
+            try:
+                response = completion(model=model, messages=messages)
+                output = response.choices[0].message.content
 
-            print(f"    Response: {output[:100]}{'...' if len(output) > 100 else ''}")
+                step = {
+                    "step": step_number,
+                    "iteration": iteration + 1,
+                    "model": model,
+                    "input": current_message,
+                    "output": output,
+                }
+                results["steps"].append(step)
 
-            current_message = output
+                print(f"    Response: {output[:100]}{'...' if len(output) > 100 else ''}")
 
-        except Exception as e:
-            print(f"    Error: {e}")
-            step = {
-                "step": i + 1,
-                "model": model,
-                "input": current_message,
-                "error": str(e),
-            }
-            results["steps"].append(step)
-            break
+                current_message = output
+
+            except Exception as e:
+                print(f"    Error: {e}")
+                step = {
+                    "step": step_number,
+                    "iteration": iteration + 1,
+                    "model": model,
+                    "input": current_message,
+                    "error": str(e),
+                }
+                results["steps"].append(step)
+                results["final_message"] = current_message
+                return results
 
     results["final_message"] = current_message
     return results
@@ -86,7 +104,10 @@ def print_summary(results: dict) -> None:
     print("TELEPHONE GAME RESULTS")
     print("=" * 60)
 
-    print(f"\nChain: {' -> '.join(results['models'])}")
+    chain_desc = " -> ".join(results["models"])
+    if results["iterations"] > 1:
+        chain_desc = f"({chain_desc}) x {results['iterations']}"
+    print(f"\nChain: {chain_desc}")
 
     print(f"\n{'ORIGINAL MESSAGE':^60}")
     print("-" * 60)
@@ -100,7 +121,8 @@ def print_summary(results: dict) -> None:
         print(f"\n{'INTERMEDIATE STEPS':^60}")
         print("-" * 60)
         for step in results["steps"]:
-            print(f"\n[{step['step']}] {step['model']}:")
+            iter_info = f" (iter {step['iteration']})" if results["iterations"] > 1 else ""
+            print(f"\n[{step['step']}] {step['model']}{iter_info}:")
             if "error" in step:
                 print(f"    ERROR: {step['error']}")
             else:
@@ -111,23 +133,33 @@ def print_summary(results: dict) -> None:
                     print(f"    {output}")
 
 
+def load_config(config_path: Path) -> dict:
+    """Load configuration from a YAML file."""
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Play telephone with LLMs - pass a message through a chain of models"
     )
     parser.add_argument(
         "message",
+        nargs="?",
         help="The initial message to pass through the chain"
+    )
+    parser.add_argument(
+        "-c", "--config",
+        type=Path,
+        help="Path to YAML config file"
     )
     parser.add_argument(
         "-m", "--models",
         nargs="+",
-        default=["gpt-4o-mini", "claude-3-5-haiku-latest", "gpt-4o-mini"],
-        help="List of models to use in the chain (default: gpt-4o-mini claude-3-5-haiku-latest gpt-4o-mini)"
+        help="List of models to use in the chain"
     )
     parser.add_argument(
         "-s", "--system",
-        default="You are playing a game of telephone. Repeat the message you receive, trying to preserve its meaning. Be concise.",
         help="System prompt to use for all models"
     )
     parser.add_argument(
@@ -136,9 +168,13 @@ def main():
         help="Don't use any system prompt"
     )
     parser.add_argument(
+        "-i", "--iterations",
+        type=int,
+        help="Number of times to loop through the model chain (default: 1)"
+    )
+    parser.add_argument(
         "-o", "--output-dir",
         type=Path,
-        default=Path("results"),
         help="Directory to save results (default: results)"
     )
     parser.add_argument(
@@ -149,18 +185,58 @@ def main():
 
     args = parser.parse_args()
 
-    system_prompt = None if args.no_system else args.system
+    # Start with defaults
+    config = {
+        "models": ["gpt-4o-mini", "claude-3-5-haiku-latest", "gpt-4o-mini"],
+        "system_prompt": "You are playing a game of telephone. Repeat the message you receive, trying to preserve its meaning. Be concise.",
+        "iterations": 1,
+        "output_dir": "results",
+    }
+
+    # Load config file if provided
+    if args.config:
+        file_config = load_config(args.config)
+        config.update(file_config)
+
+    # CLI args override config file
+    if args.message:
+        config["message"] = args.message
+    if args.models:
+        config["models"] = args.models
+    if args.system:
+        config["system_prompt"] = args.system
+    if args.no_system:
+        config["system_prompt"] = None
+    if args.iterations:
+        config["iterations"] = args.iterations
+    if args.output_dir:
+        config["output_dir"] = str(args.output_dir)
+    if args.no_save:
+        config["no_save"] = True
+
+    # Validate we have a message
+    if "message" not in config or not config["message"]:
+        parser.error("A message is required (via argument or config file)")
+
+    system_prompt = config.get("system_prompt")
+    iterations = config.get("iterations", 1)
+    output_dir = Path(config.get("output_dir", "results"))
+    no_save = config.get("no_save", False)
+
+    chain_desc = " -> ".join(config["models"])
+    if iterations > 1:
+        chain_desc = f"({chain_desc}) x {iterations}"
 
     print("Starting telephone game...")
-    print(f"Chain: {' -> '.join(args.models)}")
-    print(f"Initial message: {args.message}")
+    print(f"Chain: {chain_desc}")
+    print(f"Initial message: {config['message']}")
 
-    results = run_chain(args.message, args.models, system_prompt)
+    results = run_chain(config["message"], config["models"], system_prompt, iterations)
 
     print_summary(results)
 
-    if not args.no_save:
-        filepath = save_results(results, args.output_dir)
+    if not no_save:
+        filepath = save_results(results, output_dir)
         print(f"\nResults saved to: {filepath}")
 
 

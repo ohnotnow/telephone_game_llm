@@ -1,0 +1,17 @@
+# Multiple iterations - watch the message evolve over several passes
+# Run with: uv run python main.py -c examples/multi_iteration.yml
+
+message: "In 1969, humans first walked on the moon during the Apollo 11 mission."
+
+models:
+  - gpt-4o-mini
+  - claude-3-5-haiku-latest
+
+# Loop through the chain 3 times (6 total model calls)
+iterations: 3
+
+system_prompt: >
+  Paraphrase the following message in your own words.
+  Keep it brief but preserve the key facts.
+
+output_dir: results

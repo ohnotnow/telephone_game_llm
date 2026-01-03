@@ -1,0 +1,17 @@
+# Basic telephone game configuration
+# Run with: uv run python main.py -c examples/basic.yml
+
+message: "The quick brown fox jumps over the lazy dog"
+
+models:
+  - gpt-4o-mini
+  - claude-3-5-haiku-latest
+  - gpt-4o-mini
+
+system_prompt: >
+  You are playing a game of telephone.
+  Repeat the message you receive, trying to preserve its meaning.
+  Be concise.
+
+iterations: 1
+output_dir: results

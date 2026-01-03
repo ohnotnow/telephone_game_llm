@@ -1,0 +1,15 @@
+# No system prompt - see what happens with raw telephone!
+# Run with: uv run python main.py -c examples/no_guidance.yml
+
+message: "Please describe what a rainbow looks like to someone who has never seen one."
+
+models:
+  - gpt-4o
+  - claude-3-5-sonnet-latest
+  - gpt-4o
+
+# No system prompt - models will interpret freely
+system_prompt: null
+
+iterations: 2
+output_dir: results

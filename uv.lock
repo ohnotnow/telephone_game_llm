@@ -835,10 +835,14 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "litellm" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "litellm", specifier = ">=1.80.11" }]
+requires-dist = [
+    { name = "litellm", specifier = ">=1.80.11" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+]
 
 [[package]]
 name = "tiktoken"
