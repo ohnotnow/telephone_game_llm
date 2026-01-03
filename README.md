@@ -4,6 +4,8 @@ A fun experiment that plays [telephone](https://en.wikipedia.org/wiki/Telephone_
 
 Beyond being a bit of fun, this is a research tool for exploring how different models interpret and rephrase content - increasingly relevant as we enter an era of agentic AI where models frequently chain together.
 
+![Screenshot of the Telephone Chronicle](telephone_screenshot.png)
+
 ## Installation
 
 Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
