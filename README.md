@@ -131,6 +131,29 @@ Results are saved as JSON in the `results/` directory:
 }
 ```
 
+## Visualizing Results
+
+Generate a film noir newspaper-style HTML report from your results:
+
+```bash
+uv run python visualize.py results/run_20260103_190635.json
+```
+
+Specify a custom output path:
+
+```bash
+uv run python visualize.py results/run_20260103_190635.json -o my_report.html
+```
+
+The visualization renders your telephone game as "The Telephone Chronicle" - a vintage newspaper complete with:
+
+- A dramatic headline showing your original message
+- Each transformation step with the model name
+- Changed words highlighted as "blackmail note" cutouts (inverted text, slightly rotated like letters snipped from different newspapers)
+- Aged paper texture with sepia tones
+
+Perfect for sharing results with colleagues or embedding in presentations.
+
 ## Research ideas
 
 - Compare orderings: Does A -> B -> C produce different results than C -> B -> A?
