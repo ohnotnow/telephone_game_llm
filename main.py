@@ -182,6 +182,16 @@ def main():
         action="store_true",
         help="Don't save results to file"
     )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Generate an HTML visualization after the run"
+    )
+    parser.add_argument(
+        "--strict-punctuation",
+        action="store_true",
+        help="Treat trailing periods as changes in visualization diffs"
+    )
 
     args = parser.parse_args()
 
@@ -222,6 +232,8 @@ def main():
     iterations = config.get("iterations", 1)
     output_dir = Path(config.get("output_dir", "results"))
     no_save = config.get("no_save", False)
+    visualize = args.visualize
+    strict_punctuation = args.strict_punctuation
 
     chain_desc = " -> ".join(config["models"])
     if iterations > 1:
@@ -238,6 +250,22 @@ def main():
     if not no_save:
         filepath = save_results(results, output_dir)
         print(f"\nResults saved to: {filepath}")
+
+    if visualize:
+        from visualize import generate_html
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if not no_save:
+            html_path = filepath.with_suffix('.html')
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            html_path = output_dir / f"run_{timestamp}.html"
+
+        html = generate_html(results, strict_punctuation=strict_punctuation)
+        with open(html_path, "w") as f:
+            f.write(html)
+
+        print(f"Visualization saved to: {html_path}")
 
 
 if __name__ == "__main__":

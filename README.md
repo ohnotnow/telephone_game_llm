@@ -32,6 +32,18 @@ export OPENROUTER_API_KEY="sk-or-..."  # optional, for additional models
 uv run python main.py "The quick brown fox jumps over the lazy dog"
 ```
 
+Generate an HTML visualization in the same run:
+
+```bash
+uv run python main.py "The quick brown fox jumps over the lazy dog" --visualize
+```
+
+Use strict punctuation diffs in the visualization:
+
+```bash
+uv run python main.py "The quick brown fox jumps over the lazy dog" --visualize --strict-punctuation
+```
+
 ### Specify models
 
 ```bash
@@ -74,6 +86,8 @@ Options:
   -i, --iterations      Number of times to loop through the chain (default: 1)
   -o, --output-dir      Directory to save results (default: results)
   --no-save             Don't save results to file
+  --visualize           Generate an HTML visualization after the run
+  --strict-punctuation  Treat trailing periods as changes in visualization diffs
 ```
 
 ## Config file format
@@ -145,6 +159,17 @@ Specify a custom output path:
 
 ```bash
 uv run python visualize.py results/run_20260103_190635.json -o my_report.html
+```
+
+Options:
+
+- `-o, --output` write the report to a specific HTML file path
+- `--strict-punctuation` treat a trailing period as a change in the diff output
+
+By default, the visualization treats a trailing period added by a model as a non-change (e.g., `hello there` → `hello there.`). This is a common "auto-punctuation" behavior across models and doesn't meaningfully alter the message. If you'd prefer strict punctuation diffs, use:
+
+```bash
+uv run python visualize.py results/run_20260103_190635.json --strict-punctuation
 ```
 
 The visualization renders your telephone game as "The Telephone Chronicle" - a vintage newspaper complete with:

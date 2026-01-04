@@ -17,7 +17,43 @@ def tokenize(text: str) -> list[str]:
     return re.findall(r'\S+|\s+', text)
 
 
-def get_word_diffs(original: str, modified: str) -> list[tuple[str, bool]]:
+def _last_non_space_index(tokens: list[str]) -> int | None:
+    for i in range(len(tokens) - 1, -1, -1):
+        if not tokens[i].isspace():
+            return i
+    return None
+
+
+def _apply_trailing_period_tolerance(
+    original_tokens: list[str],
+    modified_tokens: list[str],
+    strict_punctuation: bool,
+) -> tuple[list[str], list[str]]:
+    if strict_punctuation:
+        return original_tokens, modified_tokens
+
+    orig_keys = original_tokens[:]
+    mod_keys = modified_tokens[:]
+
+    orig_last = _last_non_space_index(original_tokens)
+    mod_last = _last_non_space_index(modified_tokens)
+    if orig_last is None or mod_last is None:
+        return orig_keys, mod_keys
+
+    orig_token = original_tokens[orig_last]
+    mod_token = modified_tokens[mod_last]
+    if mod_token.endswith('.') and not orig_token.endswith('.'):
+        if mod_token[:-1] == orig_token:
+            mod_keys[mod_last] = mod_token[:-1]
+
+    return orig_keys, mod_keys
+
+
+def get_word_diffs(
+    original: str,
+    modified: str,
+    strict_punctuation: bool = False,
+) -> list[tuple[str, bool]]:
     """
     Compare two strings and return a list of (word, is_changed) tuples.
 
@@ -26,7 +62,13 @@ def get_word_diffs(original: str, modified: str) -> list[tuple[str, bool]]:
     orig_tokens = tokenize(original)
     mod_tokens = tokenize(modified)
 
-    matcher = SequenceMatcher(None, orig_tokens, mod_tokens)
+    orig_keys, mod_keys = _apply_trailing_period_tolerance(
+        orig_tokens,
+        mod_tokens,
+        strict_punctuation,
+    )
+
+    matcher = SequenceMatcher(None, orig_keys, mod_keys)
     result = []
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -60,7 +102,7 @@ def render_diff_html(tokens: list[tuple[str, bool]]) -> str:
     return ''.join(html_parts)
 
 
-def generate_html(results: dict) -> str:
+def generate_html(results: dict, strict_punctuation: bool = False) -> str:
     """Generate the full HTML visualization."""
 
     steps_html = []
@@ -70,7 +112,11 @@ def generate_html(results: dict) -> str:
         if "error" in step:
             diff_html = f'<span class="error">ERROR: {step["error"]}</span>'
         else:
-            diff_tokens = get_word_diffs(previous_output, step["output"])
+            diff_tokens = get_word_diffs(
+                previous_output,
+                step["output"],
+                strict_punctuation=strict_punctuation,
+            )
             diff_html = render_diff_html(diff_tokens)
             previous_output = step["output"]
 
@@ -540,6 +586,11 @@ def main():
         type=Path,
         help="Output HTML file path (default: same name as input with .html extension)"
     )
+    parser.add_argument(
+        "--strict-punctuation",
+        action="store_true",
+        help="Treat trailing periods as changes in the diff output"
+    )
 
     args = parser.parse_args()
 
@@ -550,7 +601,7 @@ def main():
     with open(args.input) as f:
         results = json.load(f)
 
-    html = generate_html(results)
+    html = generate_html(results, strict_punctuation=args.strict_punctuation)
 
     if args.output:
         output_path = args.output
